@@ -898,6 +898,12 @@ $total_release_amount += $total_Im_amount;
                             data-table="payroll">
                             Hold
                             </button>
+                        <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= $row['id'] ?>" 
+                            data-table="payroll">
+                            Cancel
+                            </button>    
                          </td>
                     </tr>
                 <?php endforeach; ?>
@@ -945,6 +951,12 @@ $total_release_amount += $total_Im_amount;
                             data-table="immediate_material">
                             Hold
                             </button>
+                            <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= $row['id'] ?>" 
+                            data-table="immediate_material">
+                            Cancel
+                            </button> 
                          </td>
                     </tr>
                 <?php endforeach; ?>
@@ -992,6 +1004,12 @@ $total_release_amount += $total_Im_amount;
                             data-table="reimbursements">
                             Hold
                             </button>
+                            <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= $row['id'] ?>" 
+                            data-table="reimbursements">
+                            Cancel
+                            </button> 
                          </td>
                     </tr>
                 <?php endforeach; ?>
@@ -1039,6 +1057,12 @@ $total_release_amount += $total_Im_amount;
                         data-table="misc_expenses">
                         Hold
                         </button>
+                        <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= $row['id'] ?>" 
+                            data-table="misc_expenses">
+                            Cancel
+                            </button> 
                 </td>
                     </tr>
                 <?php endforeach; ?>
@@ -1084,6 +1108,12 @@ $total_release_amount += $total_Im_amount;
                         data-table="office_expenses">
                         Hold
                         </button>
+                        <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= $row['id'] ?>" 
+                            data-table="office_expenses">
+                            Cancel
+                            </button> 
                 </td>
                     </tr>
                 <?php endforeach; ?>
@@ -1131,6 +1161,12 @@ $total_release_amount += $total_Im_amount;
                             data-table="utilities_expenses">
                             Hold
                             </button>
+                            <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= $row['id'] ?>" 
+                            data-table="utilities_expenses">
+                            Cancel
+                            </button> 
                 </td>
                     </tr>
                 <?php endforeach; ?>
@@ -1180,6 +1216,12 @@ $total_release_amount += $total_Im_amount;
                         data-table="sub_contracts">
                         Hold
                         </button>
+                        <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= $row['id'] ?>" 
+                            data-table="sub_contracts">
+                            Cancel
+                            </button> 
                 </td>
                     </tr>
                 <?php endforeach; ?>
@@ -1245,13 +1287,18 @@ $total_release_amount += $total_Im_amount;
                         <td>
                         <!-- For summary_approved (uses po_number) -->
                         <button 
-    class="btn btn-warning hold-btn"
-    data-po="<?= htmlspecialchars($po_num) ?>"
-    data-table="summary_approved">
-    Hold
-</button>
-
-    </td>
+                            class="btn btn-warning hold-btn"
+                            data-po="<?= htmlspecialchars($po_num) ?>"
+                            data-table="summary_approved">
+                            Hold
+                        </button>
+                            <button 
+                            class="btn btn-danger btn-sm cancel-btn"
+                            data-id="<?= htmlspecialchars($poData['items'][0]['id']) ?>" 
+                            data-table="summary_approved">
+                            Cancel
+                            </button>   
+                         </td>
                     </tr>
 
                     <!-- Hidden summary section -->
@@ -1887,6 +1934,43 @@ function toggleSummaryDropdown() {
     }
 });
 
+document.querySelectorAll('.cancel-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const id = this.dataset.id;
+    const table = this.dataset.table;
+
+    Swal.fire({
+      title: 'Are you sure?',
+      text: 'This will cancel the record and move it to Purchase Orders.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, cancel it!',
+      cancelButtonText: 'No, keep it'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        fetch('cancel_approved.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'id=' + encodeURIComponent(id) + '&table=' + encodeURIComponent(table)
+        })
+        .then(res => res.json()) // ✅ Parse JSON
+        .then(data => {
+          Swal.fire({
+            icon: data.status === 'success' ? 'success' : 'error',
+            title: data.status === 'success' ? 'Cancelled!' : 'Error',
+            text: data.message, // ✅ Show only the message
+            showConfirmButton: false,
+            timer: 1500
+          }).then(() => location.reload());
+        })
+        .catch(err => {
+          Swal.fire('Error', 'Something went wrong.', 'error');
+          console.error(err);
+        });
+      }
+    });
+  });
+});
 
 </script>
 

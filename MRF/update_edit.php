@@ -17,18 +17,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
 }
 
 // Update record (AJAX form submit)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'])) {
-    $id = intval($_POST['id']);
-    $item_description = $_POST['item_description'];
-    $qty = intval($_POST['qty']);
-    $status = $_POST['status'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id = $_POST['id'];
+    $item = $_POST['item_description'];
+    $qty = $_POST['qty'];
 
-    $stmt = $conn->prepare("UPDATE mrf SET item_description = ?, qty = ?, status = ? WHERE id = ?");
-    $stmt->bind_param("sisi", $item_description, $qty, $status, $id);
+    // Fetch current status to preserve it if not provided
+    $result = $conn->prepare("SELECT status FROM mrf WHERE id=?");
+    $result->bind_param("i", $id);
+    $result->execute();
+    $res = $result->get_result();
+    $current = $res->fetch_assoc();
+    $status = $current['status'];
+
+    // If the action is cancel, change status to Cancelled
+    if (isset($_POST['action']) && $_POST['action'] === 'cancel') {
+        $status = 'Cancelled';
+    }
+
+    $stmt = $conn->prepare("UPDATE mrf SET item_description=?, qty=?, status=? WHERE id=?");
+    $stmt->bind_param("sisi", $item, $qty, $status, $id);
     $stmt->execute();
-    $stmt->close();
 
-    echo "success";
-    exit;
+    echo "OK";
 }
+
 ?>
