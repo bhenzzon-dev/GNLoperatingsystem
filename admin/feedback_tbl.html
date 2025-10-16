@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <style>
+    body {
+      background-image: url(/gnlproject/img/bg.jpg);
+      font-family: sans-serif;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      margin: 0;
+      padding: 0;
+    }
+
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 50px;
+      margin-right: 20px;
+      list-style: none; /* remove bullets */
+      margin-left: 190px;
+    }
+
+    .nav-links a {
+      color: white;
+      text-decoration: none;
+      padding: 8px 12px; /* clickable area */
+      border-radius: 4px;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .nav-links a {
+      position: relative;
+      text-decoration: none;
+    }
+
+    .nav-links a::after {
+      content: "";
+      position: absolute;
+      width: 0;
+      height: 2px;
+      left: 0;
+      bottom: -3px;
+      background-color: white;
+      transition: width 0.2s ease-in-out;
+    }
+
+    .nav-links a:hover::after {
+      width: 100%;
+    }
+
+    .nav-links a:active {
+      background-color: rgba(255, 255, 255, 0.4); /* pressed state */
+    }
+
+    .nav-items {
+      display: flex;
+      margin: 0;
+      padding: 0;
+      cursor: pointer;
+      color: aliceblue;
+    }
+  </style>
+  <body>
+    <div class="navbar">
+      <nav class="nav-style">
+        <ul class="nav-links">
+          <li class="nav-items"><a href="feedback_tbl.html"></a>Feedback</li>
+          <li class="nav-items">
+            <a href="emergency_released_form.php"></a>Emergency Release
+          </li>
+          <li class="nav-items">
+            <a href="my_summary_request.php"></a>Summary Request
+          </li>
+          <li class="nav-items">
+            <a href="my_summary_approved.php"></a>Summary Approved
+          </li>
+          <li class="nav-items">
+            <a href="my_summary_released.php"></a>Summary Released
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </body>
+</html>
