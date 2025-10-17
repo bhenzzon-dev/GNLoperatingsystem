@@ -2358,7 +2358,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Fill fields depending on type
+  // Fill modal fields
   function fillModalFields(data, type) {
     switch (type) {
       case 'immediate_material':
@@ -2407,78 +2407,124 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Save updates to PHP
+  // Save updates (with Swal confirmation)
   saveBtn.addEventListener('click', () => {
-    const id = document.getElementById('recordId').value;
-    const type = document.getElementById('recordType').value;
+    Swal.fire({
+      title: 'Confirm Update',
+      text: 'Are you sure you want to update this record?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, update it!',
+      cancelButtonText: 'Cancel'
+    }).then(result => {
+      if (!result.isConfirmed) return;
 
-    // Collect data dynamically based on type
-    let payload = { id, type };
+      const id = document.getElementById('recordId').value;
+      const type = document.getElementById('recordType').value;
 
-    switch (type) {
-      case 'immediate_material':
-        payload.project_name = document.getElementById('im-project_name').value;
-        payload.particulars = document.getElementById('im-particulars').value;
-        payload.category = document.getElementById('im-category').value;
-        payload.amount = document.getElementById('im-amount').value;
-        break;
-      case 'payroll':
-        payload.project_name = document.getElementById('payroll-project_name').value;
-        payload.particulars = document.getElementById('payroll-particulars').value;
-        payload.category = document.getElementById('payroll-category').value;
-        payload.amount = document.getElementById('payroll-amount').value;
-        break;
-      case 'reimbursements':
-        payload.project_name = document.getElementById('reim-project_name').value;
-        payload.particulars = document.getElementById('reim-particulars').value;
-        payload.employee_name = document.getElementById('reim-employee_name').value;
-        payload.amount = document.getElementById('reim-amount').value;
-        break;
-      case 'misc_expenses':
-        payload.project_name = document.getElementById('misc-project_name').value;
-        payload.particulars = document.getElementById('misc-particulars').value;
-        payload.supplier_name = document.getElementById('misc-supplier_name').value;
-        payload.amount = document.getElementById('misc-amount').value;
-        break;
-      case 'office_expenses':
-        payload.particulars = document.getElementById('oe-particulars').value;
-        payload.supplier_name = document.getElementById('oe-supplier_name').value;
-        payload.amount = document.getElementById('oe-amount').value;
-        break;
-      case 'utilities_expenses':
-        payload.project_name = document.getElementById('ue-project_name').value;
-        payload.utility_type = document.getElementById('ue-utility_type').value;
-        payload.billing_period = document.getElementById('ue-billing_period').value;
-        payload.account_number = document.getElementById('ue-account_number').value;
-        payload.amount = document.getElementById('ue-amount').value;
-        break;
-      case 'sub_contracts':
-        payload.project_name = document.getElementById('sub-project_name').value;
-        payload.supplier_name = document.getElementById('sub-supplier_name').value;
-        payload.particular = document.getElementById('sub-particular').value;
-        payload.category = document.getElementById('sub-category').value;
-        payload.tcp = document.getElementById('sub-tcp').value;
-        break;
-    }
+      let payload = { id, type };
+      switch (type) {
+        case 'immediate_material':
+          payload.project_name = document.getElementById('im-project_name').value;
+          payload.particulars = document.getElementById('im-particulars').value;
+          payload.category = document.getElementById('im-category').value;
+          payload.amount = document.getElementById('im-amount').value;
+          break;
+        case 'payroll':
+          payload.project_name = document.getElementById('payroll-project_name').value;
+          payload.particulars = document.getElementById('payroll-particulars').value;
+          payload.category = document.getElementById('payroll-category').value;
+          payload.amount = document.getElementById('payroll-amount').value;
+          break;
+        case 'reimbursements':
+          payload.project_name = document.getElementById('reim-project_name').value;
+          payload.particulars = document.getElementById('reim-particulars').value;
+          payload.employee_name = document.getElementById('reim-employee_name').value;
+          payload.amount = document.getElementById('reim-amount').value;
+          break;
+        case 'misc_expenses':
+          payload.project_name = document.getElementById('misc-project_name').value;
+          payload.particulars = document.getElementById('misc-particulars').value;
+          payload.supplier_name = document.getElementById('misc-supplier_name').value;
+          payload.amount = document.getElementById('misc-amount').value;
+          break;
+        case 'office_expenses':
+          payload.particulars = document.getElementById('oe-particulars').value;
+          payload.supplier_name = document.getElementById('oe-supplier_name').value;
+          payload.amount = document.getElementById('oe-amount').value;
+          break;
+        case 'utilities_expenses':
+          payload.project_name = document.getElementById('ue-project_name').value;
+          payload.utility_type = document.getElementById('ue-utility_type').value;
+          payload.billing_period = document.getElementById('ue-billing_period').value;
+          payload.account_number = document.getElementById('ue-account_number').value;
+          payload.amount = document.getElementById('ue-amount').value;
+          break;
+        case 'sub_contracts':
+          payload.project_name = document.getElementById('sub-project_name').value;
+          payload.supplier_name = document.getElementById('sub-supplier_name').value;
+          payload.particular = document.getElementById('sub-particular').value;
+          payload.category = document.getElementById('sub-category').value;
+          payload.tcp = document.getElementById('sub-tcp').value;
+          break;
+      }
 
-    // Send data to update_record.php
-    fetch('update_record.php', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    })
-      .then(res => res.json())
-      .then(result => {
-        if (result.success) {
-          alert('Record updated successfully!');
-          location.reload();
-        } else {
-          alert('Update failed: ' + (result.message || 'Unknown error'));
-        }
+      // ✅ Save scroll and tab before reload
+      const scrollY = window.scrollY;
+      localStorage.setItem('scrollPos', scrollY);
+      const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+      if (activeTab) {
+        localStorage.setItem('activeTab', activeTab.getAttribute('href'));
+      }
+
+      // Send to PHP
+      fetch('update_record.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
       })
-      .catch(err => console.error('Save error:', err));
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            Swal.fire({
+              title: 'Updated!',
+              text: 'Record updated successfully.',
+              icon: 'success'
+            }).then(() => location.reload());
+          } else {
+            Swal.fire('Error', result.message || 'Update failed.', 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Save error:', err);
+          Swal.fire('Error', 'Something went wrong with the update.', 'error');
+        });
+    });
   });
 });
+
+// ✅ Restore scroll position and active tab
+window.addEventListener("load", () => {
+  const activeTab = localStorage.getItem("activeTab");
+  if (activeTab) {
+    const tabEl = document.querySelector(`a[href="${activeTab}"]`);
+    if (tabEl) {
+      if (typeof bootstrap !== "undefined" && bootstrap.Tab) {
+        new bootstrap.Tab(tabEl).show();
+      } else if (window.jQuery) {
+        $(tabEl).tab('show');
+      }
+    }
+    localStorage.removeItem("activeTab");
+  }
+
+  const scrollPos = localStorage.getItem("scrollPos");
+  if (scrollPos) {
+    window.scrollTo(0, scrollPos);
+    localStorage.removeItem("scrollPos");
+  }
+});
+
 </script>
 
 

@@ -6,24 +6,24 @@ require_once 'db_connect.php';
 $poQuery = "SELECT * FROM purchase_orders ORDER BY po_number, id";
 $poResult = $conn->query($poQuery);
 
-$poGroups = [];  // Array to hold grouped data
+$poGroups = [];
 
 if ($poResult->num_rows > 0) {
     while ($row = $poResult->fetch_assoc()) {
         $po_number = $row['po_number'];
-        // Group items under their PO number
         if (!isset($poGroups[$po_number])) {
             $poGroups[$po_number] = [
                 'items' => [],
                 'total' => 0,
-                'particulars' => $row['particulars'],  // Add this line
+                'particulars' => $row['particulars'],
             ];
         }
-        
+
         $poGroups[$po_number]['items'][] = $row;
-        $poGroups[$po_number]['total'] += $row['total_price'];  // assuming you have total_price column per item
+        $poGroups[$po_number]['total'] += $row['total_price'];
     }
 }
+
 $projects = [];
 
 foreach ($poGroups as $po_number => $poData) {
@@ -34,17 +34,84 @@ foreach ($poGroups as $po_number => $poData) {
     $projects[$projectName][$po_number] = $poData;
 }
 
-// Now $poGroups is an associative array keyed by po_num
-// Each entry contains 'items' (array of rows) and 'total' (sum of total_price)
+// === Handle Approved POs ===
+$approvedQuery = "SELECT * FROM purchase_orders WHERE status = 'approved'";
+$approvedResult = $conn->query($approvedQuery);
 
-$sql = "SELECT COUNT(*) AS pending_count FROM mrf WHERE status = 'Pending'";
-$result = $conn->query($sql);
-$pending_count = 0;
+if ($approvedResult && $approvedResult->num_rows > 0) {
+    while ($row = $approvedResult->fetch_assoc()) {
+        $columns = [
+            'po_number', 'item_description', 'qty', 'unit',
+            'unit_price', 'total_price', 'supplier_name', 'address',
+            'contact_number', 'contact_person', 'ship_project_name', 'ship_address',
+            'ship_contact_number', 'ship_contact_person', 'created_at',
+            'date', 'particulars', 'po_num', 'status', 'mrf_id'
+        ];
 
-if ($result && $row = $result->fetch_assoc()) {
-    $pending_count = $row['pending_count'];
+        $values = [];
+        foreach ($columns as $col) {
+            $values[] = "'" . $conn->real_escape_string($row[$col]) . "'";
+        }
+
+        $insertQuery = "INSERT INTO summary_approved (" . implode(", ", $columns) . ") VALUES (" . implode(", ", $values) . ")";
+        if ($conn->query($insertQuery)) {
+            // Update requested_mrf status to 'approved' for this mrf_id
+            $mrf_id = $conn->real_escape_string($row['mrf_id']);
+            $updateRequestedMrf = "UPDATE requested_mrf SET status = 'approved' WHERE id = '$mrf_id'";
+            $conn->query($updateRequestedMrf);
+
+            // Delete from purchase_orders after moving
+            $deleteQuery = "DELETE FROM purchase_orders WHERE id = " . intval($row['id']);
+            $conn->query($deleteQuery);
+        } else {
+            echo "Failed to insert approved PO ID " . $row['id'] . ": " . $conn->error;
+        }
+    }
 }
 
+// === Handle Declined POs ===
+$declinedQuery = "SELECT * FROM purchase_orders WHERE status = 'declined'";
+$declinedResult = $conn->query($declinedQuery);
+
+if ($declinedResult && $declinedResult->num_rows > 0) {
+    while ($row = $declinedResult->fetch_assoc()) {
+        $columns = [
+            'po_number', 'item_description', 'qty', 'unit',
+            'unit_price', 'total_price', 'supplier_name', 'address',
+            'contact_number', 'contact_person', 'ship_project_name', 'ship_address',
+            'ship_contact_number', 'ship_contact_person', 'created_at',
+            'date', 'particulars', 'po_num', 'status', 'mrf_id'
+        ];
+
+        $values = [];
+        foreach ($columns as $col) {
+            $values[] = "'" . $conn->real_escape_string($row[$col]) . "'";
+        }
+
+        $insertQuery = "INSERT INTO summary_declined (" . implode(", ", $columns) . ") VALUES (" . implode(", ", $values) . ")";
+        if ($conn->query($insertQuery)) {
+            // Update requested_mrf status to 'declined' for this mrf_id
+            $mrf_id = $conn->real_escape_string($row['mrf_id']);
+            $updateRequestedMrf = "UPDATE requested_mrf SET status = 'declined' WHERE id = '$mrf_id'";
+            $conn->query($updateRequestedMrf);
+
+            // Delete from purchase_orders after moving
+            $deleteQuery = "DELETE FROM purchase_orders WHERE id = " . intval($row['id']);
+            $conn->query($deleteQuery);
+        } else {
+            echo "Failed to insert declined PO ID " . $row['id'] . ": " . $conn->error;
+        }
+    }
+}
+
+
+// Notification count for pending POs
+$notifCount = 0;
+$notifSql = "SELECT COUNT(DISTINCT po_number) AS count FROM purchase_orders WHERE status = 'pending'";
+$notifResult = $conn->query($notifSql);
+if ($notifResult && $notifResult->num_rows > 0) {
+    $notifCount = $notifResult->fetch_assoc()['count'];
+}
 
 // === Fetch Pending Non-PO Items for Request Tab ===
 
@@ -83,7 +150,7 @@ $pendingMiscRows = $resultMiscPending ? $resultMiscPending->fetch_all(MYSQLI_ASS
 
 // Office Expenses
 $sqlOePending = "
-    SELECT oe.id, oe.status, oe.particulars, oe.amount, oe.supplier_name, oe.supplier_name, oe.created_at
+    SELECT oe.id, oe.status, oe.particulars, oe.amount, oe.supplier_name, oe.created_at
     FROM office_expenses oe
     WHERE oe.status = 'Pending'
 ";
@@ -93,7 +160,7 @@ $pendingOeRows = $resultOePending ? $resultOePending->fetch_all(MYSQLI_ASSOC) : 
 
 // Utilities
 $sqlUePending = "
-    SELECT ue.id, ue.status, p.project_name, ue.utility_type, ue.amount, ue.account_number, ue.created_at, billing_period
+    SELECT ue.id, ue.status, p.project_name, ue.utility_type, ue.amount, ue.account_number, ue.billing_period, ue.created_at
     FROM utilities_expenses ue
     INNER JOIN projects p ON ue.project_id = p.id
     WHERE ue.status = 'Pending'
@@ -122,6 +189,7 @@ $sqlImPending = "
 
 $resultImPending = $conn->query($sqlImPending);
 $pendingImRows = $resultImPending ? $resultImPending->fetch_all(MYSQLI_ASSOC) : [];
+
 ?>
 
 <!DOCTYPE html>
@@ -652,6 +720,7 @@ body.generate-pdf .hide-in-pdf {
                     <th>Category</th>
                     <th>Amount</th>
                     <th>Date</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -663,6 +732,19 @@ body.generate-pdf .hide-in-pdf {
                             <td><?= htmlspecialchars($row['category']) ?></td>
                             <td>₱<?= number_format($row['amount'], 2) ?></td>
                             <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td>
+                            <td>
+                            <button class="btn btn-danger btn-sm update-status-btn"
+                                data-status="declined"
+                                data-id="<?= $row['id'] ?>"
+                                data-type="immediate_material">
+                                Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="immediate_material">
+                                Update
+                            </button>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -682,7 +764,8 @@ body.generate-pdf .hide-in-pdf {
                     <th>Particulars</th>
                     <th>Category</th>
                     <th>Amount</th>    
-                    <th>Date</th>            
+                    <th>Date</th> 
+                    <th>Action</th>           
                 </tr>
             </thead>
             <tbody>
@@ -694,6 +777,19 @@ body.generate-pdf .hide-in-pdf {
                             <td><?= htmlspecialchars($row['category']) ?></td>
                             <td>₱<?= number_format($row['amount'], 2) ?></td>
                             <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td> <!-- New column -->
+                            <td>
+                            <button class="btn btn-danger btn-sm update-status-btn"
+                                data-status="declined"
+                                data-id="<?= $row['id'] ?>"
+                                data-type="payroll">
+                                Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="payroll">
+                                Update
+                            </button>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -714,6 +810,7 @@ body.generate-pdf .hide-in-pdf {
                     <th>Employee Name</th>
                     <th>Amount</th>
                     <th>Date</th> 
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -725,6 +822,19 @@ body.generate-pdf .hide-in-pdf {
                             <td><?= htmlspecialchars($row['employee_name']) ?></td>
                             <td>₱<?= number_format($row['amount'], 2) ?></td>
                             <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td> <!-- New column -->
+                            <td>
+                            <button class="btn btn-danger btn-sm update-status-btn"
+                                data-status="declined"
+                                data-id="<?= $row['id'] ?>"
+                                data-type="reimbursements">
+                                Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="reimbursements">
+                                Update
+                            </button>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -746,6 +856,7 @@ body.generate-pdf .hide-in-pdf {
                     <th>Supplier Name</th>
                     <th>Amount</th>
                     <th>Date</th> 
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -756,7 +867,20 @@ body.generate-pdf .hide-in-pdf {
                             <td><?= htmlspecialchars($row['particulars']) ?></td>
                             <td><?= htmlspecialchars($row['supplier_name']) ?></td>
                             <td>₱<?= number_format($row['amount'], 2) ?></td>
-                            <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td> <!-- New column -->              
+                            <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td> <!-- New column -->  
+                            <td>
+                            <button class="btn btn-danger btn-sm update-status-btn"
+                                data-status="declined"
+                                data-id="<?= $row['id'] ?>"
+                                data-type="misc_expenses">
+                                Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="misc_expenses">
+                                Update
+                            </button>
+                            </td>            
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -777,6 +901,7 @@ body.generate-pdf .hide-in-pdf {
                     <th>Supplier Name</th>
                     <th>Amount</th>
                     <th>Date</th> 
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -787,6 +912,19 @@ body.generate-pdf .hide-in-pdf {
                             <td><?= htmlspecialchars($row['supplier_name']) ?></td>
                             <td>₱<?= number_format($row['amount'], 2) ?></td>
                             <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td> <!-- New column -->
+                            <td>
+                            <button class="btn btn-danger btn-sm update-status-btn"
+                                data-status="declined"
+                                data-id="<?= $row['id'] ?>"
+                                data-type="office_expenses">
+                                Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="office_expenses">
+                                Update
+                            </button>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -809,6 +947,7 @@ body.generate-pdf .hide-in-pdf {
                     <th>Account Number</th>
                     <th>Amount</th>
                     <th>Date</th> 
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -821,6 +960,19 @@ body.generate-pdf .hide-in-pdf {
                             <td><?= htmlspecialchars($row['account_number']) ?></td>
                             <td>₱<?= number_format($row['amount'], 2) ?></td>
                             <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td> <!-- New column -->
+                            <td>
+                            <button class="btn btn-danger btn-sm update-status-btn"
+                                data-status="declined"
+                                data-id="<?= $row['id'] ?>"
+                                data-type="utilities_expenses">
+                                Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="utilities_expenses">
+                                Update
+                            </button>
+                            </td>
                             </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -842,7 +994,8 @@ body.generate-pdf .hide-in-pdf {
                     <th>Particulars</th>
                     <th>Category</th>
                     <th>Amount</th>
-                    <th>Date</th>           
+                    <th>Date</th>       
+                    <th>Action</th>    
                 </tr>
             </thead>
             <tbody>
@@ -855,6 +1008,19 @@ body.generate-pdf .hide-in-pdf {
                             <td><?= htmlspecialchars($row['category']) ?></td>
                             <td>₱<?= number_format($row['tcp'], 2) ?></td>
                             <td><?= date('F d Y, h:i A', strtotime($row['created_at'])) ?></td> <!-- New column -->
+                            <td>
+                            <button class="btn btn-danger btn-sm update-status-btn"
+                                data-status="declined"
+                                data-id="<?= $row['id'] ?>"
+                                data-type="sub_contracts">
+                                Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="sub_contracts">
+                                Update
+                            </button>
+                            </td>
                             </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -1067,7 +1233,173 @@ if (empty($projects)) {
   </div>
 </div>
 
+<!-- ✅ UNIVERSAL UPDATE MODAL -->
+<div class="modal fade" id="updateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      
+      <div class="modal-header bg-warning text-white">
+        <h5 class="modal-title">Update Record</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
 
+      <div class="modal-body">
+        <input type="hidden" id="recordId">
+        <input type="hidden" id="recordType">
+
+        <!-- ===== IMMEDIATE MATERIAL ===== -->
+        <div class="type-field" id="field-immediate_material">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="im-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="im-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Category</label>
+            <input type="text" class="form-control" id="im-category">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="im-amount">
+          </div>
+        </div>
+
+        <!-- ===== PAYROLL ===== -->
+        <div class="type-field" id="field-payroll">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="payroll-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="payroll-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Category</label>
+            <input type="text" class="form-control" id="payroll-category">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="payroll-amount">
+          </div>
+        </div>
+
+        <!-- ===== REIMBURSEMENTS ===== -->
+        <div class="type-field" id="field-reimbursements">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="reim-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="reim-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Employee Name</label>
+            <input type="text" class="form-control" id="reim-employee_name">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="reim-amount">
+          </div>
+        </div>
+
+        <!-- ===== MISC EXPENSES ===== -->
+        <div class="type-field" id="field-misc_expenses">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="misc-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="misc-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Supplier Name</label>
+            <input type="text" class="form-control" id="misc-supplier_name">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="misc-amount">
+          </div>
+        </div>
+
+        <!-- ===== OFFICE EXPENSES ===== -->
+        <div class="type-field" id="field-office_expenses">
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="oe-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Supplier Name</label>
+            <input type="text" class="form-control" id="oe-supplier_name">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="oe-amount">
+          </div>
+        </div>
+
+        <!-- ===== UTILITIES EXPENSES ===== -->
+        <div class="type-field" id="field-utilities_expenses">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="ue-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Utility Type</label>
+            <input type="text" class="form-control" id="ue-utility_type">
+          </div>
+          <div class="mb-3">
+            <label>Billing Period</label>
+            <input type="text" class="form-control" id="ue-billing_period">
+          </div>
+          <div class="mb-3">
+            <label>Account Number</label>
+            <input type="text" class="form-control" id="ue-account_number">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="ue-amount">
+          </div>
+        </div>
+
+        <!-- ===== SUB CONTRACTS ===== -->
+        <div class="type-field" id="field-sub_contracts">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="sub-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Supplier Name</label>
+            <input type="text" class="form-control" id="sub-supplier_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="sub-particular">
+          </div>
+          <div class="mb-3">
+            <label>Category</label>
+            <input type="text" class="form-control" id="sub-category">
+          </div>
+          <div class="mb-3">
+            <label>Amount (TCP)</label>
+            <input type="number" class="form-control" id="sub-tcp">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" id="saveChangesBtn" class="btn btn-warning">Save Changes</button>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 
 <!-- Bootstrap & jQuery scripts -->
@@ -1553,6 +1885,288 @@ document.addEventListener('visibilitychange', () => {
 setInterval(updateMRFCount, 5000);
 updateMRFCount(); // Initial call to get started immediately
 
+document.addEventListener('DOMContentLoaded', () => {
+  const updateModal = new bootstrap.Modal(document.getElementById('updateModal'));
+  const typeFields = document.querySelectorAll('.type-field');
+  const saveBtn = document.getElementById('saveChangesBtn');
+
+  // Handle click on any "Update" button
+  document.querySelectorAll('.update-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const type = btn.dataset.type;
+
+      // Hide all field groups
+      typeFields.forEach(f => f.style.display = 'none');
+
+      // Show only the relevant one
+      const fieldGroup = document.getElementById('field-' + type);
+      if (fieldGroup) fieldGroup.style.display = 'block';
+
+      // Save info in hidden inputs
+      document.getElementById('recordId').value = id;
+      document.getElementById('recordType').value = type;
+
+      // Fetch existing data
+      fetch(`sum_request_update_record.php?id=${id}&type=${type}`)
+        .then(res => res.json())
+        .then(data => fillModalFields(data, type))
+        .catch(err => console.error('Fetch error:', err));
+
+      updateModal.show();
+    });
+  });
+
+  // Fill modal fields
+  function fillModalFields(data, type) {
+    switch (type) {
+      case 'immediate_material':
+        document.getElementById('im-project_name').value = data.project_name || '';
+        document.getElementById('im-particulars').value = data.particulars || '';
+        document.getElementById('im-category').value = data.category || '';
+        document.getElementById('im-amount').value = data.amount || '';
+        break;
+      case 'payroll':
+        document.getElementById('payroll-project_name').value = data.project_name || '';
+        document.getElementById('payroll-particulars').value = data.particulars || '';
+        document.getElementById('payroll-category').value = data.category || '';
+        document.getElementById('payroll-amount').value = data.amount || '';
+        break;
+      case 'reimbursements':
+        document.getElementById('reim-project_name').value = data.project_name || '';
+        document.getElementById('reim-particulars').value = data.particulars || '';
+        document.getElementById('reim-employee_name').value = data.employee_name || '';
+        document.getElementById('reim-amount').value = data.amount || '';
+        break;
+      case 'misc_expenses':
+        document.getElementById('misc-project_name').value = data.project_name || '';
+        document.getElementById('misc-particulars').value = data.particulars || '';
+        document.getElementById('misc-supplier_name').value = data.supplier_name || '';
+        document.getElementById('misc-amount').value = data.amount || '';
+        break;
+      case 'office_expenses':
+        document.getElementById('oe-particulars').value = data.particulars || '';
+        document.getElementById('oe-supplier_name').value = data.supplier_name || '';
+        document.getElementById('oe-amount').value = data.amount || '';
+        break;
+      case 'utilities_expenses':
+        document.getElementById('ue-project_name').value = data.project_name || '';
+        document.getElementById('ue-utility_type').value = data.utility_type || '';
+        document.getElementById('ue-billing_period').value = data.billing_period || '';
+        document.getElementById('ue-account_number').value = data.account_number || '';
+        document.getElementById('ue-amount').value = data.amount || '';
+        break;
+      case 'sub_contracts':
+        document.getElementById('sub-project_name').value = data.project_name || '';
+        document.getElementById('sub-supplier_name').value = data.supplier_name || '';
+        document.getElementById('sub-particular').value = data.particular || '';
+        document.getElementById('sub-category').value = data.category || '';
+        document.getElementById('sub-tcp').value = data.tcp || '';
+        break;
+    }
+  }
+
+  // Save updates (with Swal confirmation)
+  saveBtn.addEventListener('click', () => {
+    Swal.fire({
+      title: 'Confirm Update',
+      text: 'Are you sure you want to update this record?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, update it!',
+      cancelButtonText: 'Cancel'
+    }).then(result => {
+      if (!result.isConfirmed) return;
+
+      const id = document.getElementById('recordId').value;
+      const type = document.getElementById('recordType').value;
+
+      let payload = { id, type };
+      switch (type) {
+        case 'immediate_material':
+          payload.project_name = document.getElementById('im-project_name').value;
+          payload.particulars = document.getElementById('im-particulars').value;
+          payload.category = document.getElementById('im-category').value;
+          payload.amount = document.getElementById('im-amount').value;
+          break;
+        case 'payroll':
+          payload.project_name = document.getElementById('payroll-project_name').value;
+          payload.particulars = document.getElementById('payroll-particulars').value;
+          payload.category = document.getElementById('payroll-category').value;
+          payload.amount = document.getElementById('payroll-amount').value;
+          break;
+        case 'reimbursements':
+          payload.project_name = document.getElementById('reim-project_name').value;
+          payload.particulars = document.getElementById('reim-particulars').value;
+          payload.employee_name = document.getElementById('reim-employee_name').value;
+          payload.amount = document.getElementById('reim-amount').value;
+          break;
+        case 'misc_expenses':
+          payload.project_name = document.getElementById('misc-project_name').value;
+          payload.particulars = document.getElementById('misc-particulars').value;
+          payload.supplier_name = document.getElementById('misc-supplier_name').value;
+          payload.amount = document.getElementById('misc-amount').value;
+          break;
+        case 'office_expenses':
+          payload.particulars = document.getElementById('oe-particulars').value;
+          payload.supplier_name = document.getElementById('oe-supplier_name').value;
+          payload.amount = document.getElementById('oe-amount').value;
+          break;
+        case 'utilities_expenses':
+          payload.project_name = document.getElementById('ue-project_name').value;
+          payload.utility_type = document.getElementById('ue-utility_type').value;
+          payload.billing_period = document.getElementById('ue-billing_period').value;
+          payload.account_number = document.getElementById('ue-account_number').value;
+          payload.amount = document.getElementById('ue-amount').value;
+          break;
+        case 'sub_contracts':
+          payload.project_name = document.getElementById('sub-project_name').value;
+          payload.supplier_name = document.getElementById('sub-supplier_name').value;
+          payload.particular = document.getElementById('sub-particular').value;
+          payload.category = document.getElementById('sub-category').value;
+          payload.tcp = document.getElementById('sub-tcp').value;
+          break;
+      }
+
+      // ✅ Save scroll and tab before reload
+      const scrollY = window.scrollY;
+      localStorage.setItem('scrollPos', scrollY);
+      const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+      if (activeTab) {
+        localStorage.setItem('activeTab', activeTab.getAttribute('href'));
+      }
+
+      // Send to PHP
+      fetch('sum_request_update_record.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            Swal.fire({
+              title: 'Updated!',
+              text: 'Record updated successfully.',
+              icon: 'success'
+            }).then(() => location.reload());
+          } else {
+            Swal.fire('Error', result.message || 'Update failed.', 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Save error:', err);
+          Swal.fire('Error', 'Something went wrong with the update.', 'error');
+        });
+    });
+  });
+});
+
+// ✅ Restore scroll position and active tab
+window.addEventListener("load", () => {
+  const activeTab = localStorage.getItem("activeTab");
+  if (activeTab) {
+    const tabEl = document.querySelector(`a[href="${activeTab}"]`);
+    if (tabEl) {
+      if (typeof bootstrap !== "undefined" && bootstrap.Tab) {
+        new bootstrap.Tab(tabEl).show();
+      } else if (window.jQuery) {
+        $(tabEl).tab('show');
+      }
+    }
+    localStorage.removeItem("activeTab");
+  }
+
+  const scrollPos = localStorage.getItem("scrollPos");
+  if (scrollPos) {
+    window.scrollTo(0, scrollPos);
+    localStorage.removeItem("scrollPos");
+  }
+});
+
+
+
+ document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.update-status-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.dataset.id;
+            const status = this.dataset.status;
+            const type = this.dataset.type;
+
+            Swal.fire({
+                title: `Are you sure?`,
+                text: `You are about to ${status} this request.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, do it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch('finance_update_status.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: `id=${id}&status=${status}&type=${type}`
+                    })
+                    .then(res => res.json()) // expecting JSON
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire({
+                                title: 'Success!',
+                                text: 'Status updated successfully.',
+                                icon: 'success'
+                            }).then(() => {
+                                // ✅ Save scroll position
+                                localStorage.setItem("scrollPos", window.scrollY);
+
+                                // Save active tab before reload
+                            const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+                            if (activeTab) {
+                                localStorage.setItem('activeTab', activeTab.getAttribute('href'));
+                            }
+
+
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire('Error', data.message || 'Failed to update.', 'error');
+                        }
+                    })
+                    .catch(() => {
+                        Swal.fire('Error', 'Something went wrong with the request.', 'error');
+                    });
+                }
+            });
+        });
+    });
+});
+
+// Restore active tab on load
+window.addEventListener("load", () => {
+    const activeTab = localStorage.getItem("activeTab");
+    if (activeTab) {
+        const tabEl = document.querySelector(`a[href="${activeTab}"]`);
+        if (tabEl) {
+            // Bootstrap 5
+            if (typeof bootstrap !== "undefined" && bootstrap.Tab) {
+                new bootstrap.Tab(tabEl).show();
+            } 
+            // Bootstrap 4 (fallback with jQuery)
+            else if (window.jQuery) {
+                $(tabEl).tab('show');
+            }
+        }
+        localStorage.removeItem("activeTab");
+    }
+
+    // restore scroll position
+    const scrollPos = localStorage.getItem("scrollPos");
+    if (scrollPos) {
+        window.scrollTo(0, scrollPos);
+        localStorage.removeItem("scrollPos");
+    }
+});
 </script>
 
 
