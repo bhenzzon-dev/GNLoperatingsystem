@@ -656,6 +656,69 @@ body.generate-pdf .hide-in-pdf {
     top: 2%;
 }
 
+/* Modal Header */
+#updateModal .modal-header {
+    background-color: #ffc107; /* Bootstrap warning color */
+    color: #fff;
+    border-bottom: 2px solid #e0a800;
+}
+
+#updateModal .modal-title {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+/* Modal Body Inputs */
+#updateModal .modal-body .form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+#updateModal .modal-body .form-control {
+    border: 1px solid #ced4da;
+    border-radius: 0.35rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#updateModal .modal-body .form-control:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+/* Modal Footer */
+#updateModal .modal-footer {
+    border-top: 2px solid #e0a800;
+}
+
+#updateModal .btn-warning {
+    background-color: #ffc107;
+    color: #212529;
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+#updateModal .btn-warning:hover {
+    background-color: #e0a800;
+    color: #fff;
+}
+
+#updateModal .btn-secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+#updateModal .btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* Responsive tweaks */
+@media (max-width: 576px) {
+    #updateModal .modal-dialog {
+        max-width: 95%;
+        margin: 1.75rem auto;
+    }
+}
+
     </style>
 </head>
 <body>
@@ -884,6 +947,11 @@ body.generate-pdf .hide-in-pdf {
                                 data-type="immediate_material">
                                 Delete
                             </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="immediate_material">
+                                Update
+                            </button>
                                 </div>
                             <?php else: ?>
                                 <em>No actions available</em>
@@ -942,6 +1010,11 @@ body.generate-pdf .hide-in-pdf {
                                 data-id="<?= $row['id'] ?>"
                                 data-type="payroll">
                                 Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="payroll">
+                                Update
                             </button>
                                 </div>
                             <?php else: ?>
@@ -1003,6 +1076,11 @@ body.generate-pdf .hide-in-pdf {
                                 data-type="reimbursements">
                                 Delete
                             </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="reimbursements">
+                                Update
+                            </button>
                                 </div>
                             <?php else: ?>
                                 <em>No actions available</em>
@@ -1063,6 +1141,11 @@ body.generate-pdf .hide-in-pdf {
                                 data-type="misc_expenses">
                                 Delete
                             </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="misc_expenses">
+                                Update
+                            </button>
                                 </div>
                             <?php else: ?>
                                 <em>No actions available</em>
@@ -1120,6 +1203,11 @@ body.generate-pdf .hide-in-pdf {
                                 data-id="<?= $row['id'] ?>"
                                 data-type="office_expenses">
                                 Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="office_expenses">
+                                Update
                             </button>
                                 </div>
                             <?php else: ?>
@@ -1182,6 +1270,11 @@ body.generate-pdf .hide-in-pdf {
                                 data-id="<?= $row['id'] ?>"
                                 data-type="utilities_expenses">
                                 Delete
+                            </button>
+                            <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="utilities_expenses">
+                                Update
                             </button>
                                 </div>
                             <?php else: ?>
@@ -1246,6 +1339,11 @@ body.generate-pdf .hide-in-pdf {
                                 data-type="sub_contracts">
                                 Delete
                                 </button>
+                                <button class="btn btn-warning btn-sm update-btn"
+                                    data-id="<?= $row['id'] ?>"
+                                    data-type="sub_contracts">
+                                Update
+                            </button>
                                 </div>
                             <?php else: ?>
                                 <em>No actions available</em>
@@ -1488,6 +1586,174 @@ if (empty($projects)) {
         </div>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ✅ UNIVERSAL UPDATE MODAL -->
+<div class="modal fade" id="updateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      
+      <div class="modal-header bg-warning text-white">
+        <h5 class="modal-title">Update Record</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="recordId">
+        <input type="hidden" id="recordType">
+
+        <!-- ===== IMMEDIATE MATERIAL ===== -->
+        <div class="type-field" id="field-immediate_material">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="im-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="im-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Category</label>
+            <input type="text" class="form-control" id="im-category">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="im-amount">
+          </div>
+        </div>
+
+        <!-- ===== PAYROLL ===== -->
+        <div class="type-field" id="field-payroll">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="payroll-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="payroll-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Category</label>
+            <input type="text" class="form-control" id="payroll-category">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="payroll-amount">
+          </div>
+        </div>
+
+        <!-- ===== REIMBURSEMENTS ===== -->
+        <div class="type-field" id="field-reimbursements">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="reim-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="reim-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Employee Name</label>
+            <input type="text" class="form-control" id="reim-employee_name">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="reim-amount">
+          </div>
+        </div>
+
+        <!-- ===== MISC EXPENSES ===== -->
+        <div class="type-field" id="field-misc_expenses">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="misc-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="misc-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Supplier Name</label>
+            <input type="text" class="form-control" id="misc-supplier_name">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="misc-amount">
+          </div>
+        </div>
+
+        <!-- ===== OFFICE EXPENSES ===== -->
+        <div class="type-field" id="field-office_expenses">
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="oe-particulars">
+          </div>
+          <div class="mb-3">
+            <label>Supplier Name</label>
+            <input type="text" class="form-control" id="oe-supplier_name">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="oe-amount">
+          </div>
+        </div>
+
+        <!-- ===== UTILITIES EXPENSES ===== -->
+        <div class="type-field" id="field-utilities_expenses">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="ue-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Utility Type</label>
+            <input type="text" class="form-control" id="ue-utility_type">
+          </div>
+          <div class="mb-3">
+            <label>Billing Period</label>
+            <input type="text" class="form-control" id="ue-billing_period">
+          </div>
+          <div class="mb-3">
+            <label>Account Number</label>
+            <input type="text" class="form-control" id="ue-account_number">
+          </div>
+          <div class="mb-3">
+            <label>Amount</label>
+            <input type="number" class="form-control" id="ue-amount">
+          </div>
+        </div>
+
+        <!-- ===== SUB CONTRACTS ===== -->
+        <div class="type-field" id="field-sub_contracts">
+          <div class="mb-3">
+            <label>Project Name</label>
+            <input type="text" class="form-control" id="sub-project_name">
+          </div>
+          <div class="mb-3">
+            <label>Supplier Name</label>
+            <input type="text" class="form-control" id="sub-supplier_name">
+          </div>
+          <div class="mb-3">
+            <label>Particulars</label>
+            <input type="text" class="form-control" id="sub-particular">
+          </div>
+          <div class="mb-3">
+            <label>Category</label>
+            <input type="text" class="form-control" id="sub-category">
+          </div>
+          <div class="mb-3">
+            <label>Amount (TCP)</label>
+            <input type="number" class="form-control" id="sub-tcp">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" id="saveChangesBtn" class="btn btn-warning">Save Changes</button>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -2058,6 +2324,160 @@ window.addEventListener("load", () => {
         window.scrollTo(0, scrollPos);
         localStorage.removeItem("scrollPos");
     }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const updateModal = new bootstrap.Modal(document.getElementById('updateModal'));
+  const typeFields = document.querySelectorAll('.type-field');
+  const saveBtn = document.getElementById('saveChangesBtn');
+
+  // Handle click on any "Update" button
+  document.querySelectorAll('.update-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const type = btn.dataset.type;
+
+      // Hide all field groups
+      typeFields.forEach(f => f.style.display = 'none');
+
+      // Show only the relevant one
+      const fieldGroup = document.getElementById('field-' + type);
+      if (fieldGroup) fieldGroup.style.display = 'block';
+
+      // Save info in hidden inputs
+      document.getElementById('recordId').value = id;
+      document.getElementById('recordType').value = type;
+
+      // Fetch existing data
+      fetch(`update_record.php?id=${id}&type=${type}`)
+        .then(res => res.json())
+        .then(data => fillModalFields(data, type))
+        .catch(err => console.error('Fetch error:', err));
+
+      updateModal.show();
+    });
+  });
+
+  // Fill fields depending on type
+  function fillModalFields(data, type) {
+    switch (type) {
+      case 'immediate_material':
+        document.getElementById('im-project_name').value = data.project_name || '';
+        document.getElementById('im-particulars').value = data.particulars || '';
+        document.getElementById('im-category').value = data.category || '';
+        document.getElementById('im-amount').value = data.amount || '';
+        break;
+      case 'payroll':
+        document.getElementById('payroll-project_name').value = data.project_name || '';
+        document.getElementById('payroll-particulars').value = data.particulars || '';
+        document.getElementById('payroll-category').value = data.category || '';
+        document.getElementById('payroll-amount').value = data.amount || '';
+        break;
+      case 'reimbursements':
+        document.getElementById('reim-project_name').value = data.project_name || '';
+        document.getElementById('reim-particulars').value = data.particulars || '';
+        document.getElementById('reim-employee_name').value = data.employee_name || '';
+        document.getElementById('reim-amount').value = data.amount || '';
+        break;
+      case 'misc_expenses':
+        document.getElementById('misc-project_name').value = data.project_name || '';
+        document.getElementById('misc-particulars').value = data.particulars || '';
+        document.getElementById('misc-supplier_name').value = data.supplier_name || '';
+        document.getElementById('misc-amount').value = data.amount || '';
+        break;
+      case 'office_expenses':
+        document.getElementById('oe-particulars').value = data.particulars || '';
+        document.getElementById('oe-supplier_name').value = data.supplier_name || '';
+        document.getElementById('oe-amount').value = data.amount || '';
+        break;
+      case 'utilities_expenses':
+        document.getElementById('ue-project_name').value = data.project_name || '';
+        document.getElementById('ue-utility_type').value = data.utility_type || '';
+        document.getElementById('ue-billing_period').value = data.billing_period || '';
+        document.getElementById('ue-account_number').value = data.account_number || '';
+        document.getElementById('ue-amount').value = data.amount || '';
+        break;
+      case 'sub_contracts':
+        document.getElementById('sub-project_name').value = data.project_name || '';
+        document.getElementById('sub-supplier_name').value = data.supplier_name || '';
+        document.getElementById('sub-particular').value = data.particular || '';
+        document.getElementById('sub-category').value = data.category || '';
+        document.getElementById('sub-tcp').value = data.tcp || '';
+        break;
+    }
+  }
+
+  // Save updates to PHP
+  saveBtn.addEventListener('click', () => {
+    const id = document.getElementById('recordId').value;
+    const type = document.getElementById('recordType').value;
+
+    // Collect data dynamically based on type
+    let payload = { id, type };
+
+    switch (type) {
+      case 'immediate_material':
+        payload.project_name = document.getElementById('im-project_name').value;
+        payload.particulars = document.getElementById('im-particulars').value;
+        payload.category = document.getElementById('im-category').value;
+        payload.amount = document.getElementById('im-amount').value;
+        break;
+      case 'payroll':
+        payload.project_name = document.getElementById('payroll-project_name').value;
+        payload.particulars = document.getElementById('payroll-particulars').value;
+        payload.category = document.getElementById('payroll-category').value;
+        payload.amount = document.getElementById('payroll-amount').value;
+        break;
+      case 'reimbursements':
+        payload.project_name = document.getElementById('reim-project_name').value;
+        payload.particulars = document.getElementById('reim-particulars').value;
+        payload.employee_name = document.getElementById('reim-employee_name').value;
+        payload.amount = document.getElementById('reim-amount').value;
+        break;
+      case 'misc_expenses':
+        payload.project_name = document.getElementById('misc-project_name').value;
+        payload.particulars = document.getElementById('misc-particulars').value;
+        payload.supplier_name = document.getElementById('misc-supplier_name').value;
+        payload.amount = document.getElementById('misc-amount').value;
+        break;
+      case 'office_expenses':
+        payload.particulars = document.getElementById('oe-particulars').value;
+        payload.supplier_name = document.getElementById('oe-supplier_name').value;
+        payload.amount = document.getElementById('oe-amount').value;
+        break;
+      case 'utilities_expenses':
+        payload.project_name = document.getElementById('ue-project_name').value;
+        payload.utility_type = document.getElementById('ue-utility_type').value;
+        payload.billing_period = document.getElementById('ue-billing_period').value;
+        payload.account_number = document.getElementById('ue-account_number').value;
+        payload.amount = document.getElementById('ue-amount').value;
+        break;
+      case 'sub_contracts':
+        payload.project_name = document.getElementById('sub-project_name').value;
+        payload.supplier_name = document.getElementById('sub-supplier_name').value;
+        payload.particular = document.getElementById('sub-particular').value;
+        payload.category = document.getElementById('sub-category').value;
+        payload.tcp = document.getElementById('sub-tcp').value;
+        break;
+    }
+
+    // Send data to update_record.php
+    fetch('update_record.php', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    })
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+          alert('Record updated successfully!');
+          location.reload();
+        } else {
+          alert('Update failed: ' + (result.message || 'Unknown error'));
+        }
+      })
+      .catch(err => console.error('Save error:', err));
+  });
 });
 </script>
 
